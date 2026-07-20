@@ -1,0 +1,163 @@
+what is .bashrc?
+A script that runs everytime you open a terminal 
+
+where it is located?
+/home/<username>
+
+what is it used for ?
+Aliases,PATH,environment variables,functions
+
+who creates it?
+OS automatically when user account is created 
+
+can we edit it ?
+Yes, it's safe to customize
+
+the code which runs on CPU is segregated as user space and kernel space
+when kernel space code runs on CPU the operation mode of CPU will be in privilege mode.
+
+logs of the kernel must go to kernel ring buffer and can be viewed using dmesg
+
+When a kernel module is loaded, the kernel allocates memory in kernel space:
+
+
+| Section      | Meaning                        | Stays After Init? |
+| ------------ | ------------------------------ | ----------------- |
+| `.text`      | Executable code                | ✔ Yes             |
+| `.rodata`    | Read-only data                 | ✔ Yes             |
+| `.data`      | Initialized global variables   | ✔ Yes             |
+| `.bss`       | Uninitialized global variables | ✔ Yes             |
+| `.init.text` | Initialization code (`__init`) | ✘ Freed           |
+| `.init.data` | Initialization data            | ✘ Freed           |
+
+
+ELF = Executable and Linkable Format
+
+It is the binary format used by:
+
+Linux executables
+
+Shared libraries
+
+Kernel (vmlinux)
+
+Kernel modules (*.ko)
+
+An ELF file contains:
+
+Program headers
+
+Symbol tables
+
+Relocation entries
+
+Sections (.text, .data, .bss, .rodata, .symtab, etc.)
+
+Kernel modules are relocatable ELF objects (ET_REL), not full executables.
+
+When you run insmod, the kernel:
+
+Loads the ELF.
+
+Allocates memory for its sections.
+
+Applies relocations.
+
+Calls the module’s init_module() function (your __init function).
+
+Frees .init sections.
+
+
+                   +-----------------------------------------+
+                   |           Kernel Virtual Memory          |
+                   |            (Global Address Space)        |
+                   +-----------------------------------------+
+
+   Static Kernel (vmlinux)                     Dynamic Module (your .ko)
+   -------------------------                   ---------------------------
+   |  .text (core kernel)  |                  |  .text (module code)     |
+   |  .rodata              | <------------+   |  .rodata                 |
+   |  .data                |              |   |  .data                   |
+   |  .bss                 |              |   |  .bss                    |
+   |  .init.text (boot)    | Freed after |   |  .init.text (module init) |
+   |  .init.data (boot)    | boot        |   |  .init.data               |
+   -------------------------              |   ----------------------------
+                                          |        Freed after
+                                          |      module init finishes
+                                          +--------------------------------
+
+                   +-----------------------------------------+
+                   |  Kernel Memory Allocators               |
+                   |  kmalloc / kfree                        |
+                   |  vmalloc / vfree                        |
+                   |  (Used by module at runtime)            |
+                   +-----------------------------------------+
+
+                   +-----------------------------------------+
+                   |  Per-CPU areas / per-process kernel stack|
+                   |  NOT specific to module                 |
+                   +-----------------------------------------+
+
+What is Kernel Tainting?
+
+When the kernel detects something that might compromise stability or reliability, it sets special flags called taint flags.
+These flags indicate that:
+
+The kernel is no longer in a “clean” state
+
+Debugging information may not be trustworthy
+
+Bugs cannot be reported to upstream kernel developers unless taint cause is known
+
+Think of it like:
+
+“Kernel has been tampered with or encountered unusual conditions.”
+You can check taint status with:
+cat /proc/sys/kernel/tainted
+
+Why does the kernel get tainted?
+
+✔ 1. Loading proprietary or closed-source modules
+
+Examples:
+
+NVIDIA driver
+
+VirtualBox kernel drivers
+
+Wireless vendor drivers (Broadcom, Realtek proprietary blobs)
+
+These modules cannot be debugged by kernel developers → kernel becomes tainted.
+
+✔ 2. Loading modules not built for the current kernel (out-of-tree modules)
+
+If you compile your own module outside the official kernel tree, taint flag will be set (depending on licensing).
+
+✔ 3. Hardware or software errors
+
+Examples:
+
+Machine check exceptions (MCE)
+
+Memory corruption
+
+CPU parity errors
+
+BIOS issues
+
+Faulty hardware detection
+
+✔ 4. Forcing modules to load using insmod --force
+
+If symbol versions don't match, the module is incompatible → taints kernel.
+
+✔ 5. Using GPL-incompatible licenses in modules
+
+A module with this in header:
+
+MODULE_LICENSE("Proprietary");
+
+
+will taint the kernel when loaded.
+
+
